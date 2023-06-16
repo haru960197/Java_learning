@@ -1,0 +1,162 @@
+第17章「例外」
+
+・エラーの種類と対応策
+javaプログラムのエラーは大きく３つに分類可能
+①文法エラー(syntax error)
+　・そもそもコンパイルできない。
+　・セミコロン忘れ、変数名の間違い、アクセスレベル間違いなど、文法間違い
+　解決方法
+　　→コードの修正
+
+②実行時エラー(runtime error)
+　・コンパイルは通るが、ファイル実行時に発生する
+　・配列の範囲外アクセス、0除算、null参照、ファイル開閉ミスなど
+　解決方法
+　　→例外処理
+
+③論理エラー(logic error)
+　・コンパイル通り、実行もできるが、出力結果が想定と違う
+　解決方法
+　　→原因個所を探し、コードを修正
+
+文法エラーと論理エラーはプログラマのミス。しかし、実行時エラーは使用者によるミスが多く、プログラマの想定外の事態である。
+この「想定外の事態」のことを「例外」と呼ぶ。
+ex) 使用者が必要なファイルをディレクトリから消してしまった、入力がnull、など
+そして、この対策を「例外処理」と呼ぶ。
+
+
+・例外処理の流れ
+mainメソッド中に例外処理を記述すると、本来の処理がわかりにくくなる。そこで、例外処理と、本来の処理を分けて記述する。
+	try {
+		// 本来の処理
+	} catch (例外の型 e) {
+		// 例外処理
+		System.out.println("Error:" + 						e.getMessage());
+	}
+これをtry-catch文と呼ぶ。
+通常実行されるのはtryブロックだけで、jVMがエラーを検知すると、以降のtryブロックはスキップされ、そのエラーに対応するcatchブロックにジャンプする。
+
+
+・例外クラス
+例外にはさまざまな種類があるため、それらを区別するため例外を表すクラスが複数存在する。どのメソッド（or コンストラクタ）がどの例外を投げるかは、APIリファレンスに掲載されていて、
+public メソッド名 (引数の型 仮引数) throws 例外クラス名
+と書いてある。（throwsは後述）
+
+・例外の種類
+例外クラスは継承階層を構成していて、Throwableクラスが最上位にいる。
+Objectクラス <- Throwableクラス
+その下に、ErrorクラスとExceptionクラスが存在する。（本書の図を参照）
+
+①Error系例外
+　・java.lang.Errorクラスの子孫
+　・回復の見込みがない致命的な状況
+　・メモリ不足、クラスファイルの破損など、
+　　→catchしなくてOK（キャッチしても打つ手がないため）
+
+②Exception系例外
+　・java.lang.Exceptionクラスの子孫
+　・「チェック例外」とも呼ばれる
+　・ファイルの開閉ミス(IOException)、ネットワークの接続ミスなど
+　　→catchして対処すべき（しないとコンパイルできない）
+
+③RuntimeException系例外
+　・java.lang.RuntimeExceptionクラスの子孫
+　・NullPointerException、ArrayIndexOutOfBoundsExceptionなど
+　　→catchしなくてもOK（任意。きりがないため）
+
+
+・例外インスタンス
+catch文の catch (例外の型 e)
+の「e」には、発生した例外クラスのインスタンスが入る。
+例外クラスのインスタンスには以下のデータが必ず入っている。
+①例外の状況説明(エラーメッセージ)
+　　→e.getMessage()で取得
+②スタックトレース(メソッドが発生した経緯、順序の情報）
+　　→e.printStackTrace()で取得
+
+例外が発生してもcatchされなかった場合、JVMでプログラムを強制終了し、スタックトレースの内容が出力される。
+
+
+・2種類以上の例外をキャッチする
+　①catch (IOException | NullPointerException e)
+　　このように「|」で複数記述する
+　②catch (Exception e)
+　　と、親クラスでざっくりとキャッチする
+
+・finally文
+エラーが発生すると、以降の処理がスキップされるため、ファイルを閉じれない、などの状況が発生しかねない。そのため、tyr-catchブロックのあとに、必ず行われる処理を記述する。
+	try {
+		// 本来の処理
+	} catch (例外クラス e) {
+		// 例外処理
+	} finally {
+		// 必ず行う処理
+	}
+finallyブロック内でエラーが発生した場合は、どうにもできない。
+finallyブロックで参照する変数は、これらのブロックの外で初期化して宣言する。
+ex )
+public static void main(String[] args) {
+	FileWriter fw = null; // 外で宣言, nullを代入
+	try {
+		fw = new FileWriter("data.txt");
+		fw.write("Hello!");
+	} catch (Exception e) {
+		System.out.println(e.getMessage());
+	} finally {
+		// fw がnullでないときだけcloseする
+		if (fw != null) {
+			try {
+				fw.close();
+			} catch (IOException e) {
+				; // 何もしない
+			}
+		}
+	}
+}
+
+・try-with-resources文
+以上のような煩雑なコードを書かなくても、自動でcloseしてくれる記法。
+	try (closeしないといけない変数の宣言と初期化) {
+		// 本来の処理
+	} catch (例外クラス e) {
+		// 例外処理
+	}
+これで、最後に自動でcloseが呼ばれる。
+ex)
+	try (FileWriter fw = new FileWriter("data.txt");) {
+		...
+closeされるのは、java.lang.AutoCloseableインタフェースを実装しているクラスのみとなるが、大体これでいける。
+
+・例外の伝播
+mainメソッドで呼び出したメソッド内で例外が発生した場合は、catchされるまで呼び出し元のメソッドに例外が伝播していく。
+
+・スロー宣言
+アクセス修飾子 戻り値 メソッド名(引数)
+	throws 例外クラス1, 例外クラス2, ... {
+と、「throws」と「内部で発生する可能性のある例外クラス」をつけて宣言すると、発生するチェック例外を、try-catch文がなくてもコンパイルが通り、発生した場合は呼び出し元へと伝播させることができる。
+「私はメソッド内で以下の例外が発生する可能性があります。発生した場合、私の呼び出し元が例外処理を行います。」という宣言。
+
+
+・例外を発生させる
+throw 例外インスタンス;
+これでJVMに例外の発生を報告することができる。
+これを例外を「投げる」という。
+ex)
+int age;
+public void setAge(int age) {
+	if (age < 0) {
+		throw new IllegalArgumentException
+		("年齢は正の数を指定すべきです。指定値=" + age);
+	}
+	this.age = age;
+}
+
+
+・自分で例外クラスを定義する
+既存の例外クラスを継承して作成する。
+ex)
+public class 例外クラス名 extends 既存のチェック例外クラス名 {
+	public 例外クラス名(String msg) {
+		super(msg);
+	}
+}
